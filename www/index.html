@@ -66,18 +66,27 @@ button.ghost{background:var(--card);color:var(--tx);border:1px solid var(--bd)}
 .art .cv{margin-top:6px;font-size:12px;display:flex;justify-content:space-between}
 .pill{font-size:11px;padding:1px 7px;border-radius:8px;background:var(--inp)}
 .fb{display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;background:var(--el);color:#111;font-weight:800;font-size:26px}.hero .fb{width:110px;height:110px;font-size:44px}
+.lbl{font-size:13px;color:var(--mut);margin:0 0 8px}
+.sw{width:38px;height:38px;border-radius:50%;border:2px solid var(--bd);padding:0}
+.sw.on{border-color:var(--tx);box-shadow:0 0 0 3px var(--acc)}
+.ah{display:flex;gap:10px;align-items:center;margin-bottom:6px}
+.ah img{width:54px;height:54px;object-fit:contain;filter:drop-shadow(0 2px 6px #0008)}
+.at{flex:1;min-width:0}.at h4{margin:0}
+.wpn{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:10px}
+.hero .wpn img{width:38px;height:38px;border:0;border-radius:6px;background:none;object-fit:contain}
+.tab{padding:8px 12px;font-size:13px}
 .hide{display:none}
 @keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .foot{margin-top:24px;font-size:12px;color:var(--mut);text-align:center}
 </style></head><body>
 <div class="wrap">
-<h1>Genshin <span>Build Analyzer</span></h1>
+<div class="row" style="justify-content:space-between;align-items:center"><h1>Genshin <span>Build Analyzer</span></h1><button class="ghost" id="thb" style="padding:10px 14px">🎨 Cores</button></div>
+<div class="card hide" id="thp" style="margin-bottom:12px"><div class="lbl">Cor da interface (as cores dos elementos não mudam)</div><div class="row" id="sws"></div></div>
 <p class="sub">Digite seu UID, escolha um personagem do seu perfil e veja a nota da build e o que melhorar.</p>
 <div class="card">
  <div class="row">
   <input id="uid" inputmode="numeric" maxlength="10" placeholder="Seu UID (ex: 800000000)">
   <button id="go">Analisar</button>
-  <button id="demo" class="ghost">Ver demo</button>
  </div>
  <div class="msg" id="msg">Os personagens precisam estar na vitrine do perfil (Showcase) e o perfil público.</div>
 </div>
@@ -87,7 +96,7 @@ button.ghost{background:var(--card);color:var(--tx);border:1px solid var(--bd)}
  <div class="grid">
   <div class="card hero" id="hero"></div>
   <div class="card">
-   <div class="tabs" id="tabs"></div>
+   <div class="lbl">Como você usa este personagem?</div><div class="tabs" id="roles"></div><div class="tabs" id="tabs"></div>
    <div id="panel"></div>
   </div>
  </div>
@@ -109,13 +118,14 @@ let DATA=null,CUR=0,TAB='tips',CHARS=null,LOC=null;
 /* ---------- Dados ao vivo (Enka.Network) ---------- */
 const ENKA='https://enka.network/api/uid/',GH='https://raw.githubusercontent.com/EnkaNetwork/API-docs/master/store/';
 async function jget(u){const r=await fetch(u);if(!r.ok)throw{status:r.status};return r.json()}
+async function store(f){const o={};for(const p of [f,'gi/'+f]){try{const d=await jget(GH+p);for(const k in d)o[k]=f==='loc.json'?Object.assign(o[k]||{},d[k]):d[k]}catch(e){}}return o}
 async function live(uid){
  let j;
  try{j=await jget(ENKA+uid)}catch(e){
   const m={400:'UID em formato inválido.',404:'Jogador não encontrado.',424:'A API da Enka está em manutenção.',429:'Muitas requisições. Aguarde um pouco.',500:'Erro no servidor da Enka.',503:'Enka indisponível no momento.'};
   throw new Error(e.status?m[e.status]||'Erro '+e.status:'Sem conexão com a Enka.Network. Se você abriu este app em uma página hospedada, baixe o arquivo HTML e abra no seu navegador.');}
  if(!j.avatarInfoList||!j.avatarInfoList.length)throw new Error('Nenhum personagem visível. Ative "Mostrar vitrine de personagens" no perfil do jogo e tente novamente.');
- try{[CHARS,LOC]=await Promise.all([CHARS||jget(GH+'characters.json'),LOC||jget(GH+'loc.json')])}catch(e){CHARS=CHARS||{};LOC=LOC||{}}
+ CHARS=CHARS||await store('characters.json');LOC=LOC||await store('loc.json');
  const L=(LOC.pt||LOC['pt']||LOC.en||{});
  const nm=h=>L[h]||null;
  const pi=j.playerInfo;
@@ -125,85 +135,76 @@ async function live(uid){
 function norm(a,c,nm){
  const f=a.fightPropMap||{},eq=a.equipList||[];
  const w=eq.find(e=>e.flat.itemType==='ITEM_WEAPON');
- const arts=eq.filter(e=>e.flat.itemType==='ITEM_RELIQUARY').map(e=>({slot:e.flat.equipType,set:nm(e.flat.setNameTextMapHash)||('Conjunto '+e.flat.setNameTextMapHash),
+ const arts=eq.filter(e=>e.flat.itemType==='ITEM_RELIQUARY').map(e=>({slot:e.flat.equipType,img:e.flat.icon?'https://enka.network/ui/'+e.flat.icon+'.png':'',set:nm(e.flat.setNameTextMapHash)||('Conjunto '+e.flat.setNameTextMapHash),
   lvl:e.reliquary.level-1,star:e.flat.rankLevel,main:{id:e.flat.reliquaryMainstat.mainPropId,v:e.flat.reliquaryMainstat.statValue},
   subs:(e.flat.reliquarySubstats||[]).map(s=>({id:s.appendPropId,v:s.statValue}))}));
  const icon=(c.SideIconName||'').replace('_Side','');
- return{name:nm(c.NameTextMapHash)||icon.replace('UI_AvatarIcon_','')||('ID '+a.avatarId),el:c.Element||'Physical',
+ const eo={40:'Fire',41:'Electric',42:'Water',43:'Grass',44:'Wind',45:'Rock',46:'Ice'};let ei='Physical',mv=0;for(const k in eo)if((f[k]||0)>mv){mv=f[k];ei=eo[k]}
+ return{name:nm(c.NameTextMapHash)||icon.replace('UI_AvatarIcon_','')||('Personagem #'+a.avatarId),el:c.Element||ei,
   img:icon?`https://enka.network/ui/${icon}.png`:'',lvl:+(a.propMap['4001']?.val||1),cons:(a.talentIdList||[]).length,
   tal:Object.values(a.skillLevelMap||{}).slice(0,3),
-  wp:w?{name:nm(w.flat.nameTextMapHash)||'Arma',lvl:w.weapon.level,ref:Object.values(w.weapon.affixMap||{0:0})[0]+1,star:w.flat.rankLevel}:{name:'Sem arma',lvl:1,ref:1,star:1},
-  st:{hp:f[2000],atk:f[2001],def:f[2002],em:f[28],cr:(f[20]||0)*100,cd:(f[22]||0)*100,er:(f[23]||0)*100,dmg:Math.max(0,...[30,40,41,42,43,44,45,46].map(k=>(f[k]||0)*100))},arts}
-}
-
-/* ---------- Demo ---------- */
-function demo(){
- const A=(slot,set,lvl,mid,mv,subs)=>({slot,set,lvl,star:5,main:{id:mid,v:mv},subs:subs.map(s=>({id:'FIGHT_PROP_'+s[0],v:s[1]}))});
- const P='FIGHT_PROP_';
- return{player:{nick:'Viajante (demo)',ar:60,sig:'Dados de exemplo',world:8},chars:[
- {name:'Raiden Shogun',el:'Electric',img:U+'Shougun.png',lvl:90,cons:2,tal:[9,10,10],wp:{name:'Lança de Engrenagem',lvl:90,ref:1,star:5},
-  st:{hp:19800,atk:1820,def:880,em:60,cr:72,cd:158,er:262,dmg:61},arts:[
-  A('EQUIP_BRACER','Emblema do Destino',20,P+'HP',4780,[['CRITICAL',10.5],['CRITICAL_HURT',14],['ATTACK_PERCENT',9.3],['CHARGE_EFFICIENCY',11]]),
-  A('EQUIP_NECKLACE','Emblema do Destino',20,P+'ATTACK',311,[['CRITICAL',7.8],['CRITICAL_HURT',21],['CHARGE_EFFICIENCY',10.4],['HP',299]]),
-  A('EQUIP_SHOES','Emblema do Destino',20,P+'CHARGE_EFFICIENCY',51.8,[['CRITICAL',6.6],['CRITICAL_HURT',20.2],['ATTACK_PERCENT',10.5],['DEFENSE',37]]),
-  A('EQUIP_RING','Emblema do Destino',20,P+'ELEC_ADD_HURT',46.6,[['CRITICAL',3.5],['CRITICAL_HURT',13.2],['ATTACK_PERCENT',14.6],['ELEMENT_MASTERY',40]]),
-  A('EQUIP_DRESS','Emblema do Destino',20,P+'CRITICAL',31.1,[['CRITICAL_HURT',14.8],['ATTACK_PERCENT',5.8],['CHARGE_EFFICIENCY',9.1],['DEFENSE_PERCENT',7.3]])]},
- {name:'Hu Tao',el:'Fire',img:U+'Hutao.png',lvl:80,cons:0,tal:[6,8,8],wp:{name:'Cajado de Homa',lvl:80,ref:1,star:5},
-  st:{hp:28600,atk:1450,def:760,em:120,cr:41,cd:92,er:100,dmg:46},arts:[
-  A('EQUIP_BRACER','Sombra Rubra',20,P+'HP',4780,[['CRITICAL',3.1],['ATTACK_PERCENT',9.9],['DEFENSE',44],['ELEMENT_MASTERY',23]]),
-  A('EQUIP_NECKLACE','Sombra Rubra',16,P+'ATTACK',311,[['HP_PERCENT',9.3],['DEFENSE_PERCENT',11.7],['CRITICAL_HURT',6.2],['ELEMENT_MASTERY',19]]),
-  A('EQUIP_SHOES','Sombra Rubra',20,P+'DEFENSE_PERCENT',58.3,[['CRITICAL',7],['CRITICAL_HURT',7.8],['HP',209],['ATTACK',33]]),
-  A('EQUIP_RING','Sombra Rubra',20,P+'FIRE_ADD_HURT',46.6,[['CRITICAL',6.6],['CRITICAL_HURT',13.2],['HP_PERCENT',4.7],['ELEMENT_MASTERY',40]]),
-  A('EQUIP_DRESS','Gladiador',12,P+'CRITICAL',31.1,[['HP_PERCENT',10.5],['CHARGE_EFFICIENCY',6.5],['DEFENSE',21],['ATTACK_PERCENT',5.2]])]},
- {name:'Xingqiu',el:'Water',img:U+'Xingqiu.png',lvl:90,cons:6,tal:[10,10,13],wp:{name:'Espada de Sacrifício',lvl:90,ref:5,star:4},
-  st:{hp:15400,atk:1210,def:870,em:40,cr:85,cd:210,er:140,dmg:66},arts:[
-  A('EQUIP_BRACER','Conjunto de Ouro',20,P+'HP',4780,[['CRITICAL',10.9],['CRITICAL_HURT',21],['ATTACK_PERCENT',9.3],['CHARGE_EFFICIENCY',5.8]]),
-  A('EQUIP_NECKLACE','Conjunto de Ouro',20,P+'ATTACK',311,[['CRITICAL',10.1],['CRITICAL_HURT',13.2],['ATTACK_PERCENT',8.2],['CHARGE_EFFICIENCY',11]]),
-  A('EQUIP_SHOES','Conjunto de Ouro',20,P+'ATTACK_PERCENT',46.6,[['CRITICAL',9.7],['CRITICAL_HURT',19.4],['CHARGE_EFFICIENCY',9.7],['HP',269]]),
-  A('EQUIP_RING','Conjunto de Ouro',20,P+'WATER_ADD_HURT',46.6,[['CRITICAL',7.4],['CRITICAL_HURT',20.2],['ATTACK_PERCENT',5.8],['CHARGE_EFFICIENCY',6.5]]),
-  A('EQUIP_DRESS','Conjunto de Ouro',20,P+'CRITICAL_HURT',62.2,[['CRITICAL',11.7],['ATTACK_PERCENT',10.5],['CHARGE_EFFICIENCY',5.2],['HP',239]])]}]};
+  wp:w?{img:w.flat.icon?'https://enka.network/ui/'+w.flat.icon+'.png':'',name:nm(w.flat.nameTextMapHash)||'Arma',lvl:w.weapon.level,ref:Object.values(w.weapon.affixMap||{0:0})[0]+1,star:w.flat.rankLevel}:{name:'Sem arma',lvl:1,ref:1,star:1},
+  st:{hp:f[2000],atk:f[2001],def:f[2002],em:f[28],cr:(f[20]||0)*100,cd:(f[22]||0)*100,er:(f[23]||0)*100,heal:(f[26]||0)*100,dmg:Math.max(0,...[30,40,41,42,43,44,45,46].map(k=>(f[k]||0)*100))},arts}
 }
 
 /* ---------- Análise ---------- */
 const sid=id=>id.replace('FIGHT_PROP_','');
 const cv=subs=>subs.reduce((t,s)=>{const i=sid(s.id);return t+(i==='CRITICAL'?s.v*2:i==='CRITICAL_HURT'?s.v:0)},0);
 function grade(s){return s>=90?'SS':s>=80?'S':s>=68?'A':s>=55?'B':s>=40?'C':'D'}
-function analyze(c){
- const tips=[],add=(p,t,d)=>tips.push({p,t,d});
+const ROLES={dps:'DPS Principal',sub:'Sub-DPS',sup:'Suporte',heal:'Cura / Escudo',em:'Reação (PE)'};
+const RW={dps:{cv:.38,main:.12,lv:.08,tal:.12,wp:.1,cl:.06,crit:.1,er:.04},
+ sub:{cv:.3,main:.12,lv:.08,tal:.12,wp:.08,cl:.06,crit:.08,er:.16},
+ sup:{cv:.08,main:.14,lv:.08,tal:.2,wp:.08,cl:.06,er:.36},
+ heal:{main:.14,lv:.08,tal:.2,wp:.08,cl:.06,er:.3,heal:.14},
+ em:{cv:.22,main:.12,lv:.08,tal:.12,wp:.08,cl:.06,crit:.06,er:.06,em:.2}};
+const LB={cv:'Qualidade dos substats (VC)',main:'Atributos principais',lv:'Nível dos artefatos',tal:'Talentos',wp:'Arma',cl:'Nível do personagem',crit:'Equilíbrio de crítico',er:'Recarga de Energia',em:'Proficiência Elemental',heal:'Bônus de Cura'};
+function guess(c){const s=c.st;if(s.heal>=20)return'heal';if(s.em>=400)return'em';if(s.cr>=40||s.cd>=100)return'dps';return'sup'}
+function analyze(c,role){
+ const tips=[],add=(p,t,d)=>tips.push({p,t,d}),st=c.st,w=RW[role];
  const pieces=c.arts.length,totCV=c.arts.reduce((t,a)=>t+cv(a.subs),0);
- const cvS=Math.min(1,totCV/240)*100;
- const mainBad=[];
- c.arts.forEach(a=>{const m=sid(a.main.id);
-  if(a.slot==='EQUIP_SHOES'&&['DEFENSE_PERCENT','DEFENSE','HP','ATTACK'].includes(m))mainBad.push(a);
-  if(a.slot==='EQUIP_RING'&&['DEFENSE_PERCENT','DEFENSE','HP','ATTACK','CHARGE_EFFICIENCY','CRITICAL'].includes(m))mainBad.push(a);
-  if(a.slot==='EQUIP_DRESS'&&['DEFENSE_PERCENT','DEFENSE','HP','ATTACK','CHARGE_EFFICIENCY'].includes(m))mainBad.push(a)});
- const mainS=pieces?100-mainBad.length*30:0;
- const lvS=c.arts.length?c.arts.reduce((t,a)=>t+a.lvl/20,0)/5*100:0;
- const tl=c.tal.length?c.tal.reduce((a,b)=>a+Math.min(b,10),0)/(c.tal.length*10)*100:0;
- const wS=Math.min(1,c.wp.lvl/90)*60+(c.wp.star/5)*40;
- const clS=Math.min(100,c.lvl/90*100);
- const crit=Math.max(0,100-Math.abs(c.st.cd/Math.max(c.st.cr,1)-2)*30)*(c.st.cr>=50?1:.7);
- const score=Math.round(cvS*.4+mainS*.12+lvS*.1+tl*.12+wS*.1+clS*.08+Math.min(100,crit)*.08);
- const cats=[['Qualidade dos substats (VC)',cvS,`VC total ${totCV.toFixed(0)} / 240`],['Atributos principais',mainS],['Nível dos artefatos',lvS],['Talentos',tl],['Arma',wS],['Nível do personagem',clS],['Equilíbrio de crítico',Math.min(100,crit),`${c.st.cr.toFixed(0)}% / ${c.st.cd.toFixed(0)}%`]];
+ const TC={dps:240,sub:200,em:200,sup:140,heal:100}[role],TE={dps:120,sub:140,sup:200,heal:180,em:130}[role];
+ const cnt={ATTACK_PERCENT:0,HP_PERCENT:0,DEFENSE_PERCENT:0};
+ c.arts.forEach(a=>[[a.main.id,2],...a.subs.map(x=>[x.id,1])].forEach(([i,n])=>{const k=sid(i);if(k in cnt)cnt[k]+=n}));
+ const top=Object.entries(cnt).sort((x,y)=>y[1]-x[1])[0],SC=top[1]>1?top[0]:'',flat=['ATTACK','HP','DEFENSE'];
+ const bad=a=>{const m=sid(a.main.id),pc=m.endsWith('PERCENT')&&SC&&m!==SC;
+  if(a.slot==='EQUIP_SHOES')return flat.includes(m);
+  if(a.slot==='EQUIP_RING')return flat.includes(m)||['CHARGE_EFFICIENCY','CRITICAL','CRITICAL_HURT'].includes(m)||pc;
+  if(a.slot==='EQUIP_DRESS')return flat.includes(m)||pc||(m==='HEAL_ADD'&&role!=='heal');
+  return false};
+ const mainBad=c.arts.filter(bad);
+ const crit=Math.max(0,100-Math.abs(st.cd/Math.max(st.cr,1)-2)*30)*(st.cr>=50?1:.7);
+ const comp={cv:Math.min(1,totCV/TC)*100,main:pieces?Math.max(0,100-mainBad.length*30):0,
+  lv:pieces?c.arts.reduce((t,a)=>t+a.lvl/20,0)/5*100:0,
+  tal:c.tal.length?c.tal.reduce((a,b)=>a+Math.min(b,10),0)/(c.tal.length*10)*100:0,
+  wp:Math.min(1,c.wp.lvl/90)*60+c.wp.star/5*40,cl:Math.min(100,c.lvl/90*100),crit:Math.min(100,crit),
+  er:Math.min(1,st.er/TE)*100,em:Math.min(1,st.em/800)*100,heal:Math.min(1,st.heal/35)*100};
+ const score=Math.round(Object.keys(w).reduce((t,k)=>t+comp[k]*w[k],0));
+ const det={cv:`VC ${totCV.toFixed(0)} / ${TC}`,crit:`${st.cr.toFixed(0)}% / ${st.cd.toFixed(0)}%`,er:`${st.er.toFixed(0)}% / ${TE}%`,em:`${Math.round(st.em)} / 800`,heal:`${st.heal.toFixed(0)}% / 35%`};
+ const cats=Object.keys(w).map(k=>[LB[k],comp[k],det[k]]);
+ const cr=['dps','sub','em'].includes(role);
  if(pieces<5)add('h','Artefatos faltando',`Só ${pieces}/5 artefatos visíveis. Equipe todos os slots.`);
  c.arts.forEach(a=>{const v=cv(a.subs),n=SLOT[a.slot];
   if(a.lvl<20)add(a.lvl<12?'h':'m',`${n} no nível +${a.lvl}`,`Suba para +20 para liberar todos os substats e o atributo principal máximo.`);
-  if(v<15&&a.lvl>=16)add('m',`${n} com VC baixo (${v.toFixed(1)})`,`Peça fraca em crítico. Vale farmar um substituto com Taxa/Dano Crítico nos substats.`)});
- mainBad.forEach(a=>add('h',`Atributo principal ruim: ${SLOT[a.slot]}`,`${pname(a.main.id)} raramente é ideal nesse slot. Prefira ATQ%/HP%/DEF% (conforme o personagem), Recarga ou PE no Relógio; dano elemental no Cálice; Crítico ou Cura na Tiara.`));
- if(c.st.cr<50)add('h','Taxa Crítica baixa',`Está em ${c.st.cr.toFixed(0)}%. Mire entre 60% e 75% para dano consistente.`);
- else if(c.st.cr>85)add('l','Taxa Crítica excessiva',`${c.st.cr.toFixed(0)}% — invista os próximos substats em Dano Crítico.`);
- if(c.st.cr>=40&&c.st.cd<c.st.cr*1.6)add('m','Dano Crítico atrás da Taxa',`Proporção ideal ≈ 1:2. Atual: ${c.st.cr.toFixed(0)}% / ${c.st.cd.toFixed(0)}%.`);
- if(c.st.er<110)add('l','Recarga de Energia',`Está em ${c.st.er.toFixed(0)}%. Se for suporte ou depender do Burst, mire 130–200%+; se não, ignore.`);
+  if(cr&&v<15&&a.lvl>=16)add('m',`${n} com VC baixo (${v.toFixed(1)})`,`Peça fraca em crítico. Vale farmar uma melhor com Taxa/Dano Crítico nos substats.`)});
+ mainBad.forEach(a=>add('h',`Atributo principal ruim: ${SLOT[a.slot]}`,`${pname(a.main.id)} não combina com esta função. Relógio: % do atributo de escala, Recarga ou PE. Cálice: dano elemental ou % de escala. Tiara: Crítico, Cura (curandeiros) ou PE.`));
+ if(cr){
+  if(st.cr<50)add('h','Taxa Crítica baixa',`Está em ${st.cr.toFixed(0)}%. Mire entre 60% e 75%.`);
+  else if(st.cr>85)add('l','Taxa Crítica excessiva',`${st.cr.toFixed(0)}% — invista os próximos substats em Dano Crítico.`);
+  if(st.cr>=40&&st.cd<st.cr*1.6)add('m','Dano Crítico atrás da Taxa',`Proporção ideal ≈ 1:2. Atual: ${st.cr.toFixed(0)}% / ${st.cd.toFixed(0)}%.`)}
+ else add('l','Crítico não é prioridade aqui','Nesta função, foque em Recarga de Energia e no atributo que escala seus buffs ou curas.');
+ if(st.er<TE)add(role==='dps'?'l':(st.er<TE*.8?'h':'m'),'Recarga de Energia',`Está em ${st.er.toFixed(0)}%. Para ${ROLES[role]}, mire ${TE}% ou mais${role==='dps'?' (só se o Supremo for importante)':''}.`);
+ if(role==='em'&&st.em<600)add(st.em<400?'h':'m','Proficiência Elemental baixa',`Está em ${Math.round(st.em)}. Mire 600–900+ para esta função.`);
+ if(role==='heal'&&st.heal<20)add('m','Bônus de cura baixo',`Está em ${st.heal.toFixed(0)}%. Uma Tiara de Bônus de Cura ajuda bastante.`);
  c.tal.forEach((t,i)=>{if(t<8)add(t<6?'h':'m',`Talento ${['de Ataque Normal','de Perícia','de Supremo'][i]||i+1} no nível ${t}`,`Melhore para 8–10 com livros e Coroa de Insight.`)});
  if(c.wp.lvl<80)add('h',`Arma no nível ${c.wp.lvl}`,`Suba a arma para 90 — é um dos maiores ganhos de ATQ barato.`);
  if(c.wp.star<4)add('m','Arma de baixa raridade',`Uma arma 4★ de forja ou evento já supera a atual na maioria dos casos.`);
  if(c.lvl<90)add(c.lvl<80?'h':'l',`Personagem nível ${c.lvl}`,`Chegue ao 90 para liberar o máximo de atributos base.`);
  const sets={};c.arts.forEach(a=>sets[a.set]=(sets[a.set]||0)+1);
- const mx=Math.max(0,...Object.values(sets)),nSets=Object.values(sets).filter(v=>v>=2).length;
- if(pieces>=5&&mx<4&&nSets<2)add('h','Sem bônus de conjunto relevante',`Complete 4 peças do mesmo conjunto ou 2+2. Atual: ${Object.entries(sets).map(([k,v])=>v+'× '+k).join(', ')}.`);
- const junk=c.arts.reduce((t,a)=>t+a.subs.filter(s=>['DEFENSE','HP','ATTACK','DEFENSE_PERCENT'].includes(sid(s.id))&&!pct(s.id)||sid(s.id)==='DEFENSE_PERCENT').length,0);
- if(junk>=5)add('m','Muitos substats fracos',`${junk} substats de DEF/valor fixo. Priorize peças com crítico e % do atributo de escala.`);
- if(!tips.length)add('l','Build excelente!','Nada crítico a corrigir. Para ir além, otimize peça a peça com substats de maior VC.');
+ const mx=Math.max(0,...Object.values(sets)),nS=Object.values(sets).filter(v=>v>=2).length;
+ if(pieces>=5&&mx<4&&nS<2)add('h','Sem bônus de conjunto relevante',`Complete 4 peças do mesmo conjunto ou 2+2. Atual: ${Object.entries(sets).map(([k,v])=>v+'× '+k).join(', ')}.`);
+ const junk=c.arts.reduce((t,a)=>t+a.subs.filter(x=>['DEFENSE','HP','ATTACK','DEFENSE_PERCENT'].includes(sid(x.id))).length,0);
+ if(junk>=5)add('m','Muitos substats fracos',`${junk} substats de DEF ou valor fixo. Priorize peças com os substats certos para a função.`);
+ if(!tips.length)add('l','Build excelente!','Nada crítico a corrigir. Para ir além, otimize peça a peça.');
  const o={h:0,m:1,l:2};tips.sort((a,b)=>o[a.p]-o[b.p]);
  return{score,g:grade(score),cats,tips,totCV}
 }
@@ -217,13 +218,16 @@ function render(){
  const {player,chars}=DATA;
  $('#app').classList.remove('hide');
  $('#pn').textContent=player.nick;$('#ps').textContent=`AR ${player.ar} · Mundo ${player.world||'-'}${player.sig?' · '+player.sig:''}`;
- $('#chars').innerHTML=chars.map((c,i)=>{c.an=analyze(c);return`<div class="ch" data-i="${i}" style="--el:${EL[c.el]}"><span class="g">${c.an.g}</span>${ic(c)}<div class="n">${c.name}</div><div class="l">Nv. ${c.lvl}</div></div>`}).join('');
+ $('#chars').innerHTML=chars.map((c,i)=>{c.role=c.role||guess(c);c.an=analyze(c,c.role);return`<div class="ch" data-i="${i}" style="--el:${EL[c.el]}"><span class="g">${c.an.g}</span>${ic(c)}<div class="n">${c.name}</div><div class="l">Nv. ${c.lvl}</div></div>`}).join('');
  document.querySelectorAll('.ch').forEach(e=>e.onclick=()=>{CUR=+e.dataset.i;show()});
  CUR=0;show();
 }
 function show(){
  const c=DATA.chars[CUR],a=c.an;
  document.body.style.setProperty('--el',EL[c.el]);
+ document.querySelectorAll('.ch .g')[CUR].textContent=a.g;
+ $('#roles').innerHTML=Object.entries(ROLES).map(([k,l])=>`<button class="tab ${c.role===k?'on':''}" data-r="${k}">${l}</button>`).join('');
+ document.querySelectorAll('#roles .tab').forEach(b=>b.onclick=()=>{c.role=b.dataset.r;c.an=analyze(c,c.role);show()});
  document.querySelectorAll('.ch').forEach((e,i)=>e.classList.toggle('on',i===CUR));
  const R=74,C=2*Math.PI*R;
  $('#hero').innerHTML=`${ic(c)}<h2>${c.name}</h2>
@@ -232,20 +236,19 @@ function show(){
  <div class="c"><b id="num">0</b><small>de 100</small></div></div>
  <div class="grade">Nota ${a.g}</div>
  <div class="stats"><div><i>HP</i>${Math.round(c.st.hp)}</div><div><i>ATQ</i>${Math.round(c.st.atk)}</div><div><i>DEF</i>${Math.round(c.st.def)}</div><div><i>PE</i>${Math.round(c.st.em)}</div><div><i>Tx. Crít.</i>${c.st.cr.toFixed(1)}%</div><div><i>Dano Crít.</i>${c.st.cd.toFixed(1)}%</div><div><i>Recarga</i>${c.st.er.toFixed(0)}%</div><div><i>Bônus Dano</i>${c.st.dmg.toFixed(1)}%</div></div>
- <div class="meta" style="margin-top:10px">${c.wp.name} · Nv.${c.wp.lvl} · R${c.wp.ref}</div>`;
+ <div class="meta wpn">${c.wp.img?`<img src="${c.wp.img}" alt="" onerror="this.remove()">`:''}<span>${c.wp.name} · Nv.${c.wp.lvl} · R${c.wp.ref}</span></div>`;
  requestAnimationFrame(()=>{$('#arc').style.strokeDashoffset=C*(1-a.score/100)});
  let n=0;const iv=setInterval(()=>{n+=Math.ceil(a.score/30);if(n>=a.score){n=a.score;clearInterval(iv)}$('#num').textContent=n},25);
  $('#tabs').innerHTML=[['tips','O que melhorar ('+a.tips.length+')'],['score','Detalhes da nota'],['arts','Artefatos']].map(([k,l])=>`<button class="tab ${TAB===k?'on':''}" data-k="${k}">${l}</button>`).join('');
- document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{TAB=b.dataset.k;show()});
+ document.querySelectorAll('#tabs .tab').forEach(b=>b.onclick=()=>{TAB=b.dataset.k;show()});
  const P=$('#panel');
  if(TAB==='tips')P.innerHTML=a.tips.map((t,i)=>`<div class="tip ${t.p}" style="animation-delay:${i*50}ms"><span class="d"></span><div><b>${t.t}</b>${t.d}</div></div>`).join('');
  if(TAB==='score'){P.innerHTML='<div class="bars">'+a.cats.map(([n,v,x])=>`<div class="bar"><div class="t"><span>${n}</span><span>${x||Math.round(v)+'%'}</span></div><div class="b"><div data-w="${v}" style="background:${col(v)}"></div></div></div>`).join('')+'</div>';
   setTimeout(()=>P.querySelectorAll('.b div').forEach(d=>d.style.width=Math.min(100,d.dataset.w)+'%'),30)}
  if(TAB==='arts'){const s=[...c.arts].sort((x,y)=>SORD.indexOf(x.slot)-SORD.indexOf(y.slot));
-  P.innerHTML='<div class="arts">'+s.map(r=>{const v=cv(r.subs);return`<div class="art"><h4>${SLOT[r.slot]}<span class="pill">+${r.lvl}</span></h4><div class="mn">${pname(r.main.id)} ${fv(r.main.id,r.main.v)}</div>${r.subs.map(x=>`<div class="sb ${/CRITICAL/.test(x.id)?'g':''}"><span>${pname(x.id)}</span><span>${fv(x.id,x.v)}</span></div>`).join('')}<div class="cv"><span style="color:var(--mut)">${r.set}</span><b style="color:${col(v/50*100)}">VC ${v.toFixed(1)}</b></div></div>`}).join('')+'</div>'}
+  P.innerHTML='<div class="arts">'+s.map(r=>{const v=cv(r.subs);return`<div class="art"><div class="ah">${r.img?`<img src="${r.img}" alt="" onerror="this.remove()">`:''}<div class="at"><h4>${SLOT[r.slot]}<span class="pill">+${r.lvl}</span></h4><div class="mn">${pname(r.main.id)} ${fv(r.main.id,r.main.v)}</div></div></div>${r.subs.map(x=>`<div class="sb ${/CRITICAL/.test(x.id)?'g':''}"><span>${pname(x.id)}</span><span>${fv(x.id,x.v)}</span></div>`).join('')}<div class="cv"><span style="color:var(--mut)">${r.set}</span><b style="color:${col(v/50*100)}">VC ${v.toFixed(1)}</b></div></div>`}).join('')+'</div>'}
 }
 function start(d,src){DATA=d;$('#src').textContent=src;render();$('#app').scrollIntoView({behavior:'smooth'})}
-$('#demo').onclick=()=>{$('#msg').textContent='Mostrando dados de exemplo.';$('#msg').className='msg';start(demo(),'Modo demo')};
 async function run(){
  const u=$('#uid').value.trim(),m=$('#msg');
  if(!/^\d{9,10}$/.test(u)){m.className='msg err';m.textContent='Digite um UID válido (9 ou 10 números).';return}
@@ -255,4 +258,13 @@ async function run(){
  $('#go').disabled=false;
 }
 $('#go').onclick=run;$('#uid').onkeydown=e=>{if(e.key==='Enter')run()};
+
+/* ---------- Temas (só interface; elementos mantêm suas cores) ---------- */
+const D={tx:'#eef0ff',mut:'#9aa0c8',card:'#ffffff10',bd:'#ffffff1f',inp:'#00000040',ok:'#5ee0a0',warn:'#ffb85c',bad:'#ff6b7d'};
+const TH={Noite:{bg:'#0d1020',bg2:'#1a1740',acc:'#f5c46b'},Oceano:{bg:'#06161c',bg2:'#0c3b46',acc:'#4fe0d0'},Rubi:{bg:'#1a0a12',bg2:'#4a1230',acc:'#ff7a9c'},Floresta:{bg:'#0a1610',bg2:'#173d2a',acc:'#9be05a'},Violeta:{bg:'#120a22',bg2:'#35176b',acc:'#c59bff'},Claro:{bg:'#f1f2fb',bg2:'#dfe2fb',acc:'#b8761a',tx:'#1b1e3d',mut:'#5b6091',card:'#ffffffcc',bd:'#2a2f6a22',inp:'#fff',ok:'#12865a',warn:'#b86a00',bad:'#c4263e'}};
+function theme(n){const t=Object.assign({},D,TH[n]);for(const k in t)document.documentElement.style.setProperty('--'+k,t[k]);try{localStorage.setItem('th',n)}catch(e){}document.querySelectorAll('.sw').forEach(b=>b.classList.toggle('on',b.dataset.n===n))}
+$('#sws').innerHTML=Object.entries(TH).map(([n,t])=>`<button class="sw" title="${n}" data-n="${n}" style="background:linear-gradient(135deg,${t.bg2},${t.acc})"></button>`).join('');
+document.querySelectorAll('.sw').forEach(b=>b.onclick=()=>theme(b.dataset.n));
+$('#thb').onclick=()=>$('#thp').classList.toggle('hide');
+let sv;try{sv=localStorage.getItem('th')}catch(e){}theme(TH[sv]?sv:'Noite');
 </script></body></html>
