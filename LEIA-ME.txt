@@ -1,0 +1,6 @@
+COMO GERAR O APK (sem instalar nada no PC)
+1. Crie um repositório no github.com (pode ser privado).
+2. Envie TODO o conteúdo desta pasta (inclusive a pasta oculta .github).
+3. Aba Actions > "Build APK" > Run workflow (ou ele roda sozinho ao enviar).
+4. Quando terminar (~5 min), abra a execução e baixe "genshin-analyzer-apk" em Artifacts.
+5. Extraia o zip e instale app-debug.apk no celular (permita fontes desconhecidas).

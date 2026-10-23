@@ -1,0 +1,2 @@
+{"appId":"com.genshin.analyzer","appName":"Genshin Analyzer","webDir":"www",
+"plugins":{"CapacitorHttp":{"enabled":true}}}
